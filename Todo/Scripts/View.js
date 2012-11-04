@@ -27,15 +27,9 @@
     app.FilterView = Backbone.View.extend({
         initialize: function () {
             this.template = _.template($("#_filterView").html());
-            this.collection.on("reset", this.reset, this);
-            this._selfResetting = false;
             this.collection.on("add remove reset change:id change:done", function () {
                 this.bindingView.sync();
             }, this);
-        },
-        reset: function () {
-            if (!this._selfResetting)
-                this._originalModels = this.collection.models;
         },
         events : {
             "click .toggle": "toggle",
@@ -79,7 +73,7 @@
                 "priority": function (a, b) {
                     if (a.isNew()) return 1;
                     if (b.isNew()) return -1;
-                    return !a.get("priority") || !b.get("priority") || a.get("priority") < b.get("priority") ? f1 : f2
+                    return asc ? (a.get("priority") - b.get("priority")) : (b.get("priority") - a.get("priority"));
                 }
             };
 
@@ -91,15 +85,7 @@
         filterPriority: function (ev) {
             setTimeout(_.bind(function () {
                 var active = this.$(".priority .btn.active").map(function () { return $(this).data("value") }).get();
-                this._selfResetting = true;
-                if (active.length == 0) {
-                    this.collection.reset(this._originalModels);
-                } else {
-                    this.collection.reset(_.filter(this._originalModels, function (model) {
-                        return _.contains(active, parseInt(model.get("priority")));
-                    }));
-                }
-                this._selfResetting = false;
+                this.collection.syncPriorityFilter(active);
             }, this), 0);
         },
         toggle : function() {
@@ -161,9 +147,10 @@
         },
         render: function () {
             this.empty();
-            if (this.collection.length) {
+            var filtered = this.collection.filtered();
+            if (filtered.length) {
                 this.$(".emptyView").hide();
-                this.collection.each(_.bind(this.addChild, this));
+                _.each(filtered, _.bind(this.addChild, this));
             } else {
                 this.$(".emptyView").show();
             }
@@ -186,7 +173,7 @@
             Backbone.View.prototype.remove.apply(this, arguments);
         },
         events : {
-            "click .row-fluid": "edit",
+            "click .row-fluid > .span11": "edit",
             "click button.save": "read",
             "click button.discard": "discard",
         },
